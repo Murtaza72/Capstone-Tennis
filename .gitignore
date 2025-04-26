@@ -1,7 +1,10 @@
-.venv/
+*venv*/
 models/
 .idea/
+__pycache__/
 
 *.pkl
 *.pyc
 *.pt
+
+*.mp4
