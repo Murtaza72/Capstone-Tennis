@@ -19,7 +19,7 @@ def main():
     video_frames, fps = read_video(input_video_path)
 
     # Detect Players and Ball
-    player_tracker = PlayerTracker(model_path='yolov8x')
+    player_tracker = PlayerTracker(model_path='models/yolov8x.pt')
 
     ball_tracker = BallTrackerNet("models/tracknet_best.pt")
     ball_detections = ball_tracker.detect(video_frames)
