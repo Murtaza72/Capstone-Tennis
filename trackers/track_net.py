@@ -155,41 +155,6 @@ class BallTrackerNet:
         return ball_track
 
     def get_ball_shot_frames(self, ball_positions):
-        # Remove None entries and keep track of their indices
-        valid_positions = [(i, y) for i, (x, y) in enumerate(ball_positions) if x is not None and y is not None]
-        if not valid_positions:
-            return []
-
-        indices, y_coords = zip(*valid_positions)
-        df = pd.DataFrame({ 'frame': indices, 'y': y_coords })
-
-        # Compute rolling average and difference
-        df['y_rolling_mean'] = df['y'].rolling(window=5, min_periods=1).mean()
-        df['delta_y'] = df['y_rolling_mean'].diff()
-
-        df['ball_hit'] = 0
-        min_change_frames = 25
-
-        for i in range(1, len(df) - int(min_change_frames * 1.2)):
-            dy_curr = df['delta_y'].iloc[i]
-            dy_next = df['delta_y'].iloc[i + 1]
-
-            # Look for a change in vertical direction
-            if (dy_curr > 0 and dy_next < 0) or (dy_curr < 0 and dy_next > 0):
-                change_count = 0
-                for j in range(i + 1, i + int(min_change_frames * 1.2) + 1):
-                    if j >= len(df):
-                        break
-                    dy_following = df['delta_y'].iloc[j]
-                    if (dy_curr > 0 and dy_following < 0) or (dy_curr < 0 and dy_following > 0):
-                        change_count += 1
-
-                if change_count > min_change_frames - 1:
-                    df.at[i, 'ball_hit'] = 1
-
-        return df[df['ball_hit'] == 1]['frame'].tolist()
-
-    def get_ball_shot_frames2(self, ball_positions):
         # ball_positions = [x for x in ball_positions]
 
         df_ball_positions = pd.DataFrame(ball_positions, columns=['x', 'y'])
