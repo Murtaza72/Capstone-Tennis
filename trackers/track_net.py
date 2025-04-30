@@ -4,7 +4,6 @@ import torch
 import torch.nn as nn
 from tqdm import tqdm
 from scipy.spatial import distance
-from constants import BALL_COLOR
 import pandas as pd
 from itertools import groupby
 import constants
@@ -235,17 +234,25 @@ class BallTrackerNet:
         track = [*zip(x, y)]
         return track
 
-    def draw_bboxes(self, frames, ball_track, box_size=30):
+    def draw_bboxes(self, frames, ball_track, box_size=25, trace=7):
         out_frames = []
 
         for num in range(len(frames)):
             frame = frames[num]
-            if ball_track[num][0]:
-                x = ball_track[num][0]
-                y = ball_track[num][1]
-                frame = cv2.rectangle(frame, (x - box_size // 2, y - box_size // 2),
-                                      (x + box_size // 2, y + box_size // 2),
-                                      BALL_COLOR, thickness=2)
+            for i in range(trace):
+                if num - i > 0:
+                    if ball_track[num - i][0]:
+                        x = ball_track[num - i][0]
+                        y = ball_track[num - i][1]
+
+                        frame = cv2.circle(frame, (x, y), radius=0, color=constants.BALL_COLOR, thickness=10 - i)
+
+                        if i == 0:
+                            frame = cv2.rectangle(frame, (x - box_size // 2, y - box_size // 2),
+                                                  (x + box_size // 2, y + box_size // 2),
+                                                  constants.BALL_COLOR, thickness=2)
+                    else:
+                        break
 
             out_frames.append(frame)
 

@@ -17,13 +17,10 @@ stub_present = True
 
 
 def main():
-    # Read Video
     input_video_path = f"input_videos/{video_number}.mp4"
     video_frames, fps = read_video(input_video_path)
 
-    # Detect Players and Ball
-    player_tracker = PlayerTracker(model_path='models/yolov8x.pt')
-
+    # Detect Ball
     ball_tracker = BallTrackerNet("models/tracknet_best.pt")
     ball_detections = ball_tracker.detect(video_frames)
     ball_detections = ball_tracker.normalize_tracknet(video_frames[0], ball_detections)
@@ -33,10 +30,13 @@ def main():
     #                                              stub_path=f"tracker_stubs/ball_detections{video_number}.pkl")
     # ball_detections = ball_tracker.interpolate_ball_positions(ball_detections)
 
+    # Detect Players
+    player_tracker = PlayerTracker(model_path='models/yolov8x.pt')
+
     player_detections = player_tracker.detect_frames(video_frames, read_from_stub=stub_present,
                                                      stub_path=f"tracker_stubs/player_detections{video_number}.pkl")
 
-    # # Court Line Detection
+    # Court Line Detection
     court_line_detector = CourtLineDetector("models/keypoints_model.pth")
     court_keypoints = court_line_detector.predict(video_frames[0])
 
@@ -61,12 +61,14 @@ def main():
         'player_1_last_shot_speed': 0,
         'player_1_total_player_speed': 0,
         'player_1_last_player_speed': 0,
+        'player_1_total_distance': 0,
 
         'player_2_number_of_shots': 0,
         'player_2_total_shot_speed': 0,
         'player_2_last_shot_speed': 0,
         'player_2_total_player_speed': 0,
         'player_2_last_player_speed': 0,
+        'player_2_total_distance': 0,
         }]
 
     for ball_shot_ind in range(len(ball_shot_frames) - 1):
@@ -112,6 +114,7 @@ def main():
 
         current_player_stats[f'player_{opponent_player_id}_total_player_speed'] += speed_of_opponent
         current_player_stats[f'player_{opponent_player_id}_last_player_speed'] = speed_of_opponent
+        current_player_stats[f'player_{opponent_player_id}_total_distance'] += distance_covered_by_opponent_meters
 
         player_stats_data.append(current_player_stats)
 
@@ -152,60 +155,10 @@ def main():
     # Draw frame number on top left corner
     for i, frame in enumerate(output_video_frames):
         cv2.putText(frame, f"Frame: {i}", (10, 30),
-                    cv2.FONT_HERSHEY_SIMPLEX, 1, (255, 255, 0), 2)
+                    cv2.FONT_HERSHEY_SIMPLEX, 1, (255, 255, 255), 2)
 
     save_video(output_video_frames, f"output_videos/video_{video_number}.mp4", fps)
 
 
-def test():
-    # Load OpenPifPaf model
-    predictor = openpifpaf.Predictor(checkpoint='resnet50')
-
-    def get_pose_keypoints(image_bgr):
-        image_rgb = cv2.cvtColor(image_bgr, cv2.COLOR_BGR2RGB)
-        predictions, _, _ = predictor.numpy_image(image_rgb)
-
-        if len(predictions) == 0:
-            return None
-
-        person = predictions[0]
-        keypoints = []
-        for kp in person.data:
-            x, y, conf = kp
-            keypoints.append((x, y, conf))
-
-        return keypoints
-
-    def draw_keypoints(image_bgr, keypoints, conf_threshold=0.3):
-        if keypoints is None:
-            return image_bgr
-
-        for (x, y, conf) in keypoints:
-            if conf > conf_threshold:
-                cv2.circle(image_bgr, (int(x), int(y)), 4, (0, 255, 0), -1)
-        return image_bgr
-
-    video_path = f'input_videos/{video_number}.mp4'
-    cap = cv2.VideoCapture(video_path)
-
-    fourcc = cv2.VideoWriter_fourcc(*'mp4v')
-    out = cv2.VideoWriter(f'output_videos/pose_{video_number}.mp4', fourcc, 30.0, (int(cap.get(3)), int(cap.get(4))))
-
-    while cap.isOpened():
-        ret, frame = cap.read()
-        if not ret:
-            break
-
-        keypoints = get_pose_keypoints(frame)
-        frame_with_keypoints = draw_keypoints(frame.copy(), keypoints)
-
-        out.write(frame_with_keypoints)
-
-    cap.release()
-    out.release()
-
-
 if __name__ == "__main__":
     main()
-
-    # test()
