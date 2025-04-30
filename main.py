@@ -12,10 +12,13 @@ import cv2
 import pandas as pd
 from copy import deepcopy
 
+video_number = 0
+stub_present = True
+
 
 def main():
     # Read Video
-    input_video_path = "input_videos/2.mp4"
+    input_video_path = f"input_videos/{video_number}.mp4"
     video_frames, fps = read_video(input_video_path)
 
     # Detect Players and Ball
@@ -23,16 +26,17 @@ def main():
 
     ball_tracker = BallTrackerNet("models/tracknet_best.pt")
     ball_detections = ball_tracker.detect(video_frames)
+    ball_detections = ball_tracker.normalize_tracknet(video_frames[0], ball_detections)
 
     # ball_tracker = BallTracker("models/yolo5_last.pt")
-    # ball_detections = ball_tracker.detect_frames(video_frames, read_from_stub=True,
-    #                                              stub_path="tracker_stubs/b0_detections.pkl")
+    # ball_detections = ball_tracker.detect_frames(video_frames, read_from_stub=stub_present,
+    #                                              stub_path=f"tracker_stubs/ball_detections{video_number}.pkl")
     # ball_detections = ball_tracker.interpolate_ball_positions(ball_detections)
 
-    player_detections = player_tracker.detect_frames(video_frames, read_from_stub=True,
-                                                     stub_path="tracker_stubs/player_detections2.pkl")
+    player_detections = player_tracker.detect_frames(video_frames, read_from_stub=stub_present,
+                                                     stub_path=f"tracker_stubs/player_detections{video_number}.pkl")
 
-    # Court Line Detection
+    # # Court Line Detection
     court_line_detector = CourtLineDetector("models/keypoints_model.pth")
     court_keypoints = court_line_detector.predict(video_frames[0])
 
@@ -43,8 +47,7 @@ def main():
     mini_court = MiniCourt(video_frames[0])
 
     # Detect ball shots
-    ball_shot_frames = ball_tracker.get_ball_shot_frames2(ball_detections)
-    # ball_shot_frames = ball_tracker.get_ball_shot_frames(ball_detections)
+    ball_shot_frames = ball_tracker.get_ball_shot_frames(ball_detections)
 
     # Convert positions to mini court positions
     player_mini_court_detections, ball_mini_court_detections = mini_court.convert_bounding_boxes_to_mini_court_coordinates(
@@ -69,7 +72,7 @@ def main():
     for ball_shot_ind in range(len(ball_shot_frames) - 1):
         start_frame = ball_shot_frames[ball_shot_ind]
         end_frame = ball_shot_frames[ball_shot_ind + 1]
-        ball_shot_time_in_seconds = (end_frame - start_frame) / 24  # 24fps
+        ball_shot_time_in_seconds = (end_frame - start_frame) / fps
 
         # Get distance covered by the ball
         distance_covered_by_ball_pixels = measure_distance(ball_mini_court_detections[start_frame][1],
@@ -123,15 +126,14 @@ def main():
     player_stats_data_df['player_2_average_shot_speed'] = player_stats_data_df['player_2_total_shot_speed'] / \
                                                           player_stats_data_df['player_2_number_of_shots']
     player_stats_data_df['player_1_average_player_speed'] = player_stats_data_df['player_1_total_player_speed'] / \
-                                                            player_stats_data_df['player_2_number_of_shots']
-    player_stats_data_df['player_2_average_player_speed'] = player_stats_data_df['player_2_total_player_speed'] / \
                                                             player_stats_data_df['player_1_number_of_shots']
+    player_stats_data_df['player_2_average_player_speed'] = player_stats_data_df['player_2_total_player_speed'] / \
+                                                            player_stats_data_df['player_2_number_of_shots']
 
     # Draw output
     # Draw Player Bounding Boxes
     output_video_frames = player_tracker.draw_bboxes(video_frames, player_detections)
-    output_video_frames = ball_tracker.draw_bboxes(video_frames, ball_detections)
-    # output_video_frames = ball_draw_bboxes(video_frames, ball_track)
+    output_video_frames = ball_tracker.draw_bboxes(output_video_frames, ball_detections)
 
     # Draw court Keypoints
     output_video_frames = court_line_detector.draw_keypoints_on_video(output_video_frames, court_keypoints)
@@ -139,9 +141,9 @@ def main():
     # Draw Mini Court
     output_video_frames = mini_court.draw_mini_court(output_video_frames)
     output_video_frames = mini_court.draw_points_on_mini_court(
-        output_video_frames, player_mini_court_detections)
+        output_video_frames, player_mini_court_detections, color=constants.PLAYER_COLOR)
     output_video_frames = mini_court.draw_points_on_mini_court(
-        output_video_frames, ball_mini_court_detections, color=(0, 255, 255))
+        output_video_frames, ball_mini_court_detections, color=constants.BALL_COLOR)
 
     # Draw Player Stats
     output_video_frames = draw_player_stats(
@@ -152,8 +154,58 @@ def main():
         cv2.putText(frame, f"Frame: {i}", (10, 30),
                     cv2.FONT_HERSHEY_SIMPLEX, 1, (255, 255, 0), 2)
 
-    save_video(output_video_frames, "output_videos/out.mp4")
+    save_video(output_video_frames, f"output_videos/video_{video_number}.mp4", fps)
+
+
+def test():
+    # Load OpenPifPaf model
+    predictor = openpifpaf.Predictor(checkpoint='resnet50')
+
+    def get_pose_keypoints(image_bgr):
+        image_rgb = cv2.cvtColor(image_bgr, cv2.COLOR_BGR2RGB)
+        predictions, _, _ = predictor.numpy_image(image_rgb)
+
+        if len(predictions) == 0:
+            return None
+
+        person = predictions[0]
+        keypoints = []
+        for kp in person.data:
+            x, y, conf = kp
+            keypoints.append((x, y, conf))
+
+        return keypoints
+
+    def draw_keypoints(image_bgr, keypoints, conf_threshold=0.3):
+        if keypoints is None:
+            return image_bgr
+
+        for (x, y, conf) in keypoints:
+            if conf > conf_threshold:
+                cv2.circle(image_bgr, (int(x), int(y)), 4, (0, 255, 0), -1)
+        return image_bgr
+
+    video_path = f'input_videos/{video_number}.mp4'
+    cap = cv2.VideoCapture(video_path)
+
+    fourcc = cv2.VideoWriter_fourcc(*'mp4v')
+    out = cv2.VideoWriter(f'output_videos/pose_{video_number}.mp4', fourcc, 30.0, (int(cap.get(3)), int(cap.get(4))))
+
+    while cap.isOpened():
+        ret, frame = cap.read()
+        if not ret:
+            break
+
+        keypoints = get_pose_keypoints(frame)
+        frame_with_keypoints = draw_keypoints(frame.copy(), keypoints)
+
+        out.write(frame_with_keypoints)
+
+    cap.release()
+    out.release()
 
 
 if __name__ == "__main__":
     main()
+
+    # test()

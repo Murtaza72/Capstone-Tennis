@@ -7,6 +7,7 @@ from scipy.spatial import distance
 from constants import BALL_COLOR
 import pandas as pd
 from itertools import groupby
+import constants
 
 
 class ConvBlock(nn.Module):
@@ -100,7 +101,6 @@ class BallTrackerNet:
         ball_track = self.remove_outliers(ball_track, dists)
 
         ball_track = self.interpolation(ball_track)
-
         return ball_track
 
     def infer_model(self, frames):
@@ -155,8 +155,7 @@ class BallTrackerNet:
         return ball_track
 
     def get_ball_shot_frames(self, ball_positions):
-        # ball_positions = [x for x in ball_positions]
-
+        # convert the list into pandas dataframe
         df_ball_positions = pd.DataFrame(ball_positions, columns=['x', 'y'])
 
         df_ball_positions['ball_hit'] = 0
@@ -164,8 +163,8 @@ class BallTrackerNet:
         df_ball_positions['mid_y_rolling_mean'] = df_ball_positions['y'].rolling(window=5, min_periods=1,
                                                                                  center=False).mean()
         df_ball_positions['delta_y'] = df_ball_positions['mid_y_rolling_mean'].diff()
+        minimum_change_frames_for_hit = constants.MINIMUM_HIT_FRAME_CHANGE
 
-        minimum_change_frames_for_hit = 25
         for i in range(1, len(df_ball_positions) - int(minimum_change_frames_for_hit * 1.2)):
             negative_position_change = df_ball_positions['delta_y'].iloc[i] > 0 and df_ball_positions['delta_y'].iloc[
                 i + 1] < 0
@@ -236,20 +235,30 @@ class BallTrackerNet:
         track = [*zip(x, y)]
         return track
 
-    def draw_bboxes(self, frames, ball_track, box_size=50):
-        height, width = frames[0].shape[:2]
-
+    def draw_bboxes(self, frames, ball_track, box_size=30):
         out_frames = []
 
         for num in range(len(frames)):
             frame = frames[num]
             if ball_track[num][0]:
-                x = int(ball_track[num][0] * (width / 640))
-                y = int(ball_track[num][1] * (height / 360))
+                x = ball_track[num][0]
+                y = ball_track[num][1]
                 frame = cv2.rectangle(frame, (x - box_size // 2, y - box_size // 2),
                                       (x + box_size // 2, y + box_size // 2),
-                                      BALL_COLOR, thickness=3)
+                                      BALL_COLOR, thickness=2)
 
             out_frames.append(frame)
 
         return out_frames
+
+    def normalize_tracknet(self, frame, ball_track):
+        height, width = frame.shape[:2]
+
+        out_detections = []
+
+        for num in range(len(ball_track)):
+            x = int(ball_track[num][0] * (width / 640))
+            y = int(ball_track[num][1] * (height / 360))
+            out_detections.append((x, y))
+
+        return out_detections

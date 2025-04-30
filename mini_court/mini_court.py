@@ -120,16 +120,17 @@ class MiniCourt:
         self.start_y = self.end_y - self.drawing_rectangle_height
 
     def draw_court(self, frame):
-        for i in range(0, len(self.drawing_key_points), 2):
-            x = int(self.drawing_key_points[i])
-            y = int(self.drawing_key_points[i + 1])
-            cv2.circle(frame, (x, y), 5, (0, 0, 255), -1)
-
         # draw Lines
         for line in self.lines:
             start_point = (int(self.drawing_key_points[line[0] * 2]), int(self.drawing_key_points[line[0] * 2 + 1]))
             end_point = (int(self.drawing_key_points[line[1] * 2]), int(self.drawing_key_points[line[1] * 2 + 1]))
-            cv2.line(frame, start_point, end_point, (0, 0, 0), 2)
+            cv2.line(frame, start_point, end_point, constants.COURT_LINE_COLOR, 2)
+
+        # keypoints
+        for i in range(0, len(self.drawing_key_points), 2):
+            x = int(self.drawing_key_points[i])
+            y = int(self.drawing_key_points[i + 1])
+            cv2.circle(frame, (x, y), 5, (0, 0, 255), -1)
 
         # Draw net
         net_start_point = (
@@ -144,9 +145,10 @@ class MiniCourt:
         shapes = np.zeros_like(frame, np.uint8)
 
         # Draw the rectangle
-        cv2.rectangle(shapes, (self.start_x, self.start_y), (self.end_x, self.end_y), (255, 255, 255), cv2.FILLED)
+        cv2.rectangle(shapes, (self.start_x, self.start_y), (self.end_x, self.end_y), constants.COURT_BG_COLOR,
+                      cv2.FILLED)
         out = frame.copy()
-        alpha = 0.5
+        alpha = 0.25
         mask = shapes.astype(bool)
         out[mask] = cv2.addWeighted(frame, alpha, shapes, 1 - alpha, 0)[mask]
 
@@ -161,7 +163,7 @@ class MiniCourt:
         return output_frames
 
     def get_start_point_of_mini_court(self):
-        return (self.court_start_x, self.court_start_y)
+        return self.court_start_x, self.court_start_y
 
     def get_width_of_mini_court(self):
         return self.court_drawing_width
@@ -192,17 +194,18 @@ class MiniCourt:
         # Convert to mini court coordinates
         mini_court_x_distance_pixels = self.convert_meters_to_pixels(distance_from_keypoint_x_meters)
         mini_court_y_distance_pixels = self.convert_meters_to_pixels(distance_from_keypoint_y_meters)
-        closest_mini_coourt_keypoint = (
+        closest_mini_court_keypoint = (
             self.drawing_key_points[closest_key_point_index * 2],
             self.drawing_key_points[closest_key_point_index * 2 + 1]
             )
 
-        mini_court_player_position = (closest_mini_coourt_keypoint[0] + mini_court_x_distance_pixels,
-                                      closest_mini_coourt_keypoint[1] + mini_court_y_distance_pixels)
+        mini_court_player_position = (closest_mini_court_keypoint[0] + mini_court_x_distance_pixels,
+                                      closest_mini_court_keypoint[1] + mini_court_y_distance_pixels)
 
         return mini_court_player_position
 
-    def convert_bounding_boxes_to_mini_court_coordinates(self, player_boxes, ball_positions, original_court_key_points):
+    def convert_bounding_boxes_to_mini_court_coordinates(self, player_boxes, ball_positions,
+                                                         original_court_key_points):
         player_heights = {
             1: constants.PLAYER_1_HEIGHT_METERS,
             2: constants.PLAYER_2_HEIGHT_METERS
@@ -249,13 +252,13 @@ class MiniCourt:
                     closest_key_point = (original_court_key_points[closest_key_point_index * 2],
                                          original_court_key_points[closest_key_point_index * 2 + 1])
 
-                    mini_court_ball_position = self.get_mini_court_coordinates(ball_position,
-                                                                               closest_key_point,
-                                                                               closest_key_point_index,
-                                                                               max_player_height_in_pixels,
-                                                                               player_heights[player_id]
-                                                                               )
-                    output_ball_boxes.append({ 1: mini_court_ball_position })
+                    mini_court_player_position = self.get_mini_court_coordinates(ball_position,
+                                                                                 closest_key_point,
+                                                                                 closest_key_point_index,
+                                                                                 max_player_height_in_pixels,
+                                                                                 player_heights[player_id]
+                                                                                 )
+                    output_ball_boxes.append({ 1: mini_court_player_position })
             output_player_boxes.append(output_player_bboxes_dict)
 
         return output_player_boxes, output_ball_boxes
