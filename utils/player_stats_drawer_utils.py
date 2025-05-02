@@ -21,10 +21,10 @@ def draw_player_stats(output_video_frames, player_stats):
         frame = output_video_frames[index]
         shapes = np.zeros_like(frame, np.uint8)
 
-        width = 390
-        height = 310
+        width = 380
+        height = 300
 
-        start_x = frame.shape[1] - 400
+        start_x = 20
         start_y = frame.shape[0] - 500
         end_x = start_x + width
         end_y = start_y + height

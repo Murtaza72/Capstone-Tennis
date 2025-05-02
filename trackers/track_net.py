@@ -247,10 +247,11 @@ class BallTrackerNet:
 
                         frame = cv2.circle(frame, (x, y), radius=0, color=constants.BALL_COLOR, thickness=10 - i)
 
-                        if i == 0:
-                            frame = cv2.rectangle(frame, (x - box_size // 2, y - box_size // 2),
-                                                  (x + box_size // 2, y + box_size // 2),
-                                                  constants.BALL_COLOR, thickness=2)
+                        if box_size is not None:
+                            if i == 0:
+                                frame = cv2.rectangle(frame, (x - box_size // 2, y - box_size // 2),
+                                                      (x + box_size // 2, y + box_size // 2),
+                                                      constants.BALL_COLOR, thickness=2)
                     else:
                         break
 

@@ -5,7 +5,7 @@ from utils import (read_video,
                    convert_pixel_distance_to_meters
                    )
 import constants
-from trackers import PlayerTracker, BallTrackerNet, BallTracker
+from trackers import PlayerTracker, BallTrackerNet, PlayerPoseDetector
 from court_line_detector import CourtLineDetector
 from mini_court import MiniCourt
 import cv2
@@ -31,7 +31,7 @@ def main():
     # ball_detections = ball_tracker.interpolate_ball_positions(ball_detections)
 
     # Detect Players
-    player_tracker = PlayerTracker(model_path='models/yolov8x.pt')
+    player_tracker = PlayerTracker('models/yolov8x.pt')
 
     player_detections = player_tracker.detect_frames(video_frames, read_from_stub=stub_present,
                                                      stub_path=f"tracker_stubs/player_detections{video_number}.pkl")
@@ -42,6 +42,10 @@ def main():
 
     # choose players
     player_detections = player_tracker.choose_and_filter_players(court_keypoints, player_detections)
+
+    player_pose = PlayerPoseDetector("models/yolo11l-pose")
+    player_pose_detections = player_pose.detect_pose(video_frames, player_detections, read_from_stub=stub_present,
+                                                     stub_path=f"tracker_stubs/player_pose{video_number}.pkl")
 
     # MiniCourt visualization
     mini_court = MiniCourt(video_frames[0])
@@ -103,8 +107,7 @@ def main():
                                                                                mini_court.get_width_of_mini_court()
                                                                                )
 
-        speed_of_opponent = distance_covered_by_opponent_meters / \
-                            ball_shot_time_in_seconds * 3.6
+        speed_of_opponent = distance_covered_by_opponent_meters / ball_shot_time_in_seconds * 3.6
 
         current_player_stats = deepcopy(player_stats_data[-1])
         current_player_stats['frame_num'] = start_frame
@@ -134,9 +137,10 @@ def main():
                                                             player_stats_data_df['player_2_number_of_shots']
 
     # Draw output
-    # Draw Player Bounding Boxes
-    output_video_frames = player_tracker.draw_bboxes(video_frames, player_detections)
-    output_video_frames = ball_tracker.draw_bboxes(output_video_frames, ball_detections)
+    # Draw Player Bounding Boxes and Pose
+    output_video_frames = player_pose_detections
+    output_video_frames = player_tracker.draw_bboxes(output_video_frames, player_detections)
+    output_video_frames = ball_tracker.draw_bboxes(output_video_frames, ball_detections, box_size=None, trace=5)
 
     # Draw court Keypoints
     output_video_frames = court_line_detector.draw_keypoints_on_video(output_video_frames, court_keypoints)
@@ -152,7 +156,7 @@ def main():
     output_video_frames = draw_player_stats(
         output_video_frames, player_stats_data_df)
 
-    # Draw frame number on top left corner
+    # Draw frame number in the top left corner
     for i, frame in enumerate(output_video_frames):
         cv2.putText(frame, f"Frame: {i}", (10, 30),
                     cv2.FONT_HERSHEY_SIMPLEX, 1, (255, 255, 255), 2)
