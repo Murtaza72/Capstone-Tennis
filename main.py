@@ -12,7 +12,7 @@ import cv2
 import pandas as pd
 from copy import deepcopy
 
-video_number = 0
+video_number = 3
 stub_present = True
 
 
@@ -24,11 +24,6 @@ def main():
     ball_tracker = BallTrackerNet("models/tracknet_best.pt")
     ball_detections = ball_tracker.detect(video_frames)
     ball_detections = ball_tracker.normalize_tracknet(video_frames[0], ball_detections)
-
-    # ball_tracker = BallTracker("models/yolo5_last.pt")
-    # ball_detections = ball_tracker.detect_frames(video_frames, read_from_stub=stub_present,
-    #                                              stub_path=f"tracker_stubs/ball_detections{video_number}.pkl")
-    # ball_detections = ball_tracker.interpolate_ball_positions(ball_detections)
 
     # Detect Players
     player_tracker = PlayerTracker('models/yolov8x.pt')
@@ -158,7 +153,7 @@ def main():
 
     # Draw frame number in the top left corner
     for i, frame in enumerate(output_video_frames):
-        cv2.putText(frame, f"Frame: {i}", (10, 30),
+        cv2.putText(frame, f"Frame: {i}", (20, 30),
                     cv2.FONT_HERSHEY_SIMPLEX, 1, (255, 255, 255), 2)
 
     save_video(output_video_frames, f"output_videos/video_{video_number}.mp4", fps)
