@@ -7,7 +7,10 @@ project will detect players and the tennis ball using YOLO and also utilizes CNN
 
 ## Output Videos
 
-![Screenshot](output_videos/screenshot.jpeg)
+![Screenshot 1](screenshots/1.jpg)
+![Screenshot 2](screenshots/2.png)
+![Screenshot 3](screenshots/3.png)
+![Screenshot 4](screenshots/4.jpg)
 
 ## Models Used
 
